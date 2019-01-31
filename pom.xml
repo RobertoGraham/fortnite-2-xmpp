@@ -47,6 +47,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <java.version>11</java.version>
         <fortnite-2.version>2.1.0</fortnite-2.version>
+        <smack.version>4.3.1</smack.version>
     </properties>
 
     <dependencies>
@@ -54,6 +55,24 @@
             <groupId>io.github.robertograham</groupId>
             <artifactId>fortnite-2</artifactId>
             <version>${fortnite-2.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.igniterealtime.smack</groupId>
+            <artifactId>smack-java7</artifactId>
+            <version>${smack.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.igniterealtime.smack</groupId>
+            <artifactId>smack-tcp</artifactId>
+            <version>${smack.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.igniterealtime.smack</groupId>
+            <artifactId>smack-extensions</artifactId>
+            <version>${smack.version}</version>
         </dependency>
     </dependencies>
 

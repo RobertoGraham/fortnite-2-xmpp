@@ -52,6 +52,24 @@ public final class Main {
 }
 ```
 
+By default fortnite-2-xmpp will not debug raw XMPP traffic but this can be enabled like so:
+
+```java
+import io.github.robertograham.fortnite2.implementation.DefaultFortnite;
+import io.github.robertograham.fortnite2.xmpp.implementation.DefaultFortniteXmpp;
+
+public final class Main {
+
+    public static void main(final String[] args) {
+        final var fortnite = DefaultFortnite.Builder.newInstance("epicGamesEmailAddress", "epicGamesPassword")
+            .build();
+        final var fortniteXmpp = DefaultFortniteXmpp.Builder.newInstance(fortnite)
+            .setDebugXmppConnections(true)
+            .build();
+    }
+}
+```
+
 ### Cleaning up
 
 When you no longer need your client instance, remember to close your XMPP connections with a call to `FortniteXmpp.close()`. Usage examples further in this document will make 
