@@ -91,3 +91,45 @@ public final class Main {
     }
 }
 ```
+
+### Chat API
+
+Register an `OnChatMessageReceivedListener`, send a message to the authenticated account and wait for the message to be self-received
+
+```java
+import io.github.robertograham.fortnite2.implementation.DefaultFortnite;
+import io.github.robertograham.fortnite2.xmpp.implementation.DefaultFortniteXmpp;
+
+import java.io.IOException;
+import java.util.ArrayList;
+
+public final class Main {
+
+    public static void main(final String[] args) {
+        final var messageStringList = new ArrayList<String>();
+        try (
+            final var fortnite = DefaultFortnite.Builder.newInstance("epicGamesEmailAddress", "epicGamesPassword")
+                .build();
+            final var fortniteXmpp = DefaultFortniteXmpp.Builder.newInstance(fortnite)
+                .setOnChatMessageReceivedListener((final var accountId, final var messageBody) ->
+                    messageStringList.add(String.format("%s: %s", accountId, messageBody)))
+                .setDebugXmppConnections(true)
+                .build()
+        ) {
+            fortniteXmpp.chat()
+                .sendMessageToAccount(
+                    fortnite.account()
+                        .findOneBySessionAccountId()
+                        .orElseThrow(),
+                    "WE LOVE FORTNITE WE LOVE FORTNITE"
+                );
+            while (messageStringList.isEmpty())
+                System.out.println("Awaiting receipt");
+            messageStringList.forEach(System.out::println);
+        } catch (final IOException exception) {
+            // findOneBySessionAccountId unexpected response
+            // OR sendMessageToAccount failed
+        }
+    }
+}
+```
