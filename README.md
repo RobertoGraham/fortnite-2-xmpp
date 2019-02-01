@@ -125,6 +125,41 @@ public final class Main {
 }
 ```
 
+Register an `OnFriendPresenceReceivedListener` that stores friends and their presence details in a `Map`
+
+```java
+import io.github.robertograham.fortnite2.implementation.DefaultFortnite;
+import io.github.robertograham.fortnite2.xmpp.domain.Session;
+import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Status;
+import io.github.robertograham.fortnite2.xmpp.implementation.DefaultFortniteXmpp;
+
+import java.util.AbstractMap.SimpleEntry;
+import java.util.HashMap;
+import java.util.Map.Entry;
+
+public final class Main {
+
+    public static void main(final String[] args) {
+        final var accountIdToStatusSessionEntryMap = new HashMap<String, Entry<Status, Session>>();
+        try (
+            final var fortnite = DefaultFortnite.Builder.newInstance("epicGamesEmailAddress", "epicGamesPassword")
+                .build();
+            final var fortniteXmpp = DefaultFortniteXmpp.Builder.newInstance(fortnite)
+                .setOnFriendPresenceReceivedListener((final var accountId, final var status, final var sessionOptional) ->
+                    accountIdToStatusSessionEntryMap.put(accountId, new SimpleEntry<>(status, sessionOptional.orElse(null)))
+                )
+                .build()
+        ) {
+            while (accountIdToStatusSessionEntryMap.isEmpty())
+                System.out.println("Awaiting presence");
+            accountIdToStatusSessionEntryMap.forEach((final var accountId, final var statusToSessionEntry) ->
+                System.out.printf("%s[%s]: %s\n", accountId, statusToSessionEntry.getKey(), statusToSessionEntry.getValue())
+            );
+        }
+    }
+}
+```
+
 ### Chat API
 
 Register an `OnChatMessageReceivedListener`, send a message to the authenticated account and wait for the message to be self-received

@@ -2,13 +2,17 @@ package io.github.robertograham.fortnite2.xmpp.implementation;
 
 import io.github.robertograham.fortnite2.client.Fortnite;
 import io.github.robertograham.fortnite2.xmpp.client.FortniteXmpp;
+import io.github.robertograham.fortnite2.xmpp.domain.Session;
+import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Status;
 import io.github.robertograham.fortnite2.xmpp.listener.OnChatMessageReceivedListener;
+import io.github.robertograham.fortnite2.xmpp.listener.OnFriendPresenceReceivedListener;
 import io.github.robertograham.fortnite2.xmpp.listener.OnFriendsListReceivedListener;
 import io.github.robertograham.fortnite2.xmpp.resource.ChatResource;
 import org.jivesoftware.smack.SmackConfiguration;
 import org.jivesoftware.smack.SmackException;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.filter.StanzaTypeFilter;
+import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.roster.packet.RosterPacket;
 import org.jivesoftware.smack.tcp.XMPPTCPConnection;
 import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration;
@@ -33,12 +37,14 @@ public final class DefaultFortniteXmpp implements FortniteXmpp {
     private final XMPPTCPConnection prodServiceXmppTcpConnection;
     private final OnChatMessageReceivedListener onChatMessageReceivedListener;
     private final OnFriendsListReceivedListener onFriendsListReceivedListener;
+    private final OnFriendPresenceReceivedListener onFriendPresenceReceivedListener;
     private final ChatResource chatResource;
 
     private DefaultFortniteXmpp(final Builder builder) throws InterruptedException, XMPPException, SmackException, IOException {
         fortnite = builder.fortnite;
         onChatMessageReceivedListener = builder.onChatMessageReceivedListener;
         onFriendsListReceivedListener = builder.onFriendsListReceivedListener;
+        onFriendPresenceReceivedListener = builder.onFriendPresenceReceivedListener;
         SmackConfiguration.DEBUG = builder.debugXmppConnections;
         xmppDomainpart = Domainpart.fromOrThrowUnchecked("prod.ol.epicgames.com");
         prodServiceXmppTcpConnection = buildProdServiceXmppTcpConnection();
@@ -54,6 +60,28 @@ public final class DefaultFortniteXmpp implements FortniteXmpp {
                     .collect(Collectors.toSet()))
                 .ifPresent(onFriendsListReceivedListener::onFriendsListReceived),
             new StanzaTypeFilter(RosterPacket.class)
+        );
+        prodServiceXmppTcpConnection.addAsyncStanzaListener(
+            (final var stanza) -> Optional.of(stanza)
+                .filter((final var nonNullStanza) -> nonNullStanza instanceof Presence)
+                .map((final var nonNullStanza) -> (Presence) nonNullStanza)
+                .filter((final var presence) ->
+                    Presence.Type.available == presence.getType()
+                        || Presence.Type.unavailable == presence.getType()
+                )
+                .ifPresent((final var presence) -> Optional.ofNullable(presence.getFrom().getLocalpartOrNull())
+                    .ifPresent((final var localpart) -> {
+                        final var accountIdString = localpart.asUnescapedString();
+                        final var status = Presence.Type.available == presence.getType() ?
+                            Presence.Mode.available == presence.getMode() ?
+                                Status.ONLINE
+                                : Status.AWAY
+                            : Status.OFFLINE;
+                        final var sessionOptional = JsonToOptionalOfClassParser.INSTANCE.parseJsonToOptionalOfClass(DefaultSession.class, presence.getStatus())
+                            .map((final var defaultSession) -> (Session) defaultSession);
+                        onFriendPresenceReceivedListener.onFriendPresenceReceived(accountIdString, status, sessionOptional);
+                    })),
+            new StanzaTypeFilter(Presence.class)
         );
         chatResource = DefaultChatResource.newInstance(onChatMessageReceivedListener, prodServiceXmppTcpConnection);
         prodServiceXmppTcpConnection.connect()
@@ -89,6 +117,8 @@ public final class DefaultFortniteXmpp implements FortniteXmpp {
         private OnChatMessageReceivedListener onChatMessageReceivedListener = (final var accountId, final var messageBody) -> {
         };
         private OnFriendsListReceivedListener onFriendsListReceivedListener = (final var accountIds) -> {
+        };
+        private OnFriendPresenceReceivedListener onFriendPresenceReceivedListener = (final var accountId, final var status, final var sessionOptional) -> {
         };
         private boolean debugXmppConnections = false;
 
@@ -127,6 +157,18 @@ public final class DefaultFortniteXmpp implements FortniteXmpp {
          */
         public Builder setOnFriendsListReceivedListener(final OnFriendsListReceivedListener onFriendsListReceivedListener) {
             this.onFriendsListReceivedListener = Objects.requireNonNull(onFriendsListReceivedListener, "onFriendsListReceivedListener cannot be null");
+            return this;
+        }
+
+        /**
+         * @param onFriendPresenceReceivedListener the {@link OnFriendPresenceReceivedListener} to call
+         *                                         {@link OnFriendPresenceReceivedListener#onFriendPresenceReceived(String, Status, Optional)}
+         *                                         on a friend's presence is received
+         * @return the {@link Builder} instance this was called on
+         * @throws NullPointerException if {@code onFriendPresenceReceivedListener} is {@code null}
+         */
+        public Builder setOnFriendPresenceReceivedListener(final OnFriendPresenceReceivedListener onFriendPresenceReceivedListener) {
+            this.onFriendPresenceReceivedListener = Objects.requireNonNull(onFriendPresenceReceivedListener, "onFriendPresenceReceivedListener cannot be null");
             return this;
         }
 
