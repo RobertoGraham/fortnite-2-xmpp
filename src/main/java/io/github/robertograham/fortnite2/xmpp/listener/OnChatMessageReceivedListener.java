@@ -1,7 +1,7 @@
 package io.github.robertograham.fortnite2.xmpp.listener;
 
 /**
- * registered using {@link io.github.robertograham.fortnite2.xmpp.implementation.DefaultFortniteXmpp.Builder#setOnChatMessageReceivedListener(OnChatMessageReceivedListener)}
+ * Registered using {@link io.github.robertograham.fortnite2.xmpp.implementation.DefaultFortniteXmpp.Builder#setOnChatMessageReceivedListener(OnChatMessageReceivedListener)}
  *
  * @since 1.0.0
  */

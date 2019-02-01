@@ -92,6 +92,39 @@ public final class Main {
 }
 ```
 
+### Listeners
+
+Register an `OnFriendsListReceivedListener` that prints the `Account` representation of every friend
+
+```java
+import io.github.robertograham.fortnite2.implementation.DefaultFortnite;
+import io.github.robertograham.fortnite2.xmpp.implementation.DefaultFortniteXmpp;
+
+import java.io.IOException;
+
+public final class Main {
+
+    public static void main(final String[] args) {
+        try (
+            final var fortnite = DefaultFortnite.Builder.newInstance("epicGamesEmailAddress", "epicGamesPassword")
+                .build();
+            final var fortniteXmpp = DefaultFortniteXmpp.Builder.newInstance(fortnite)
+                .setOnFriendsListReceivedListener((final var accountIds) -> {
+                    try {
+                        fortnite.account()
+                            .findAllByAccountIds(accountIds.toArray(String[]::new))
+                            .ifPresent((final var accounts) -> accounts.forEach(System.out::println));
+                    } catch (final IOException exception) {
+                        // findAllByAccountIds unexpected response
+                    }
+                })
+                .build()
+        ) {
+        }
+    }
+}
+```
+
 ### Chat API
 
 Register an `OnChatMessageReceivedListener`, send a message to the authenticated account and wait for the message to be self-received
