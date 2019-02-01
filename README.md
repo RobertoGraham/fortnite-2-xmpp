@@ -7,6 +7,8 @@ A Java 11+ client for Fortnite's XMPP services
 ## Features
 
 * Ability to send chat messages and process inbound chat messages
+* Ability to process friends list received after connecting
+* Ability to process friends' presence updates
 
 ## Installation
 
