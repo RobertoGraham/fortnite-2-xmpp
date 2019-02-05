@@ -23,5 +23,6 @@ public interface FortniteXmpp extends AutoCloseable {
      * @return the xmpp connection used to communicate with Epic Games' prod xmpp service
      * @since 1.2.0
      */
+    @Deprecated
     XMPPTCPConnection prodService();
 }
