@@ -1,6 +1,7 @@
 package io.github.robertograham.fortnite2.xmpp.client;
 
 import io.github.robertograham.fortnite2.xmpp.resource.ChatResource;
+import org.jivesoftware.smack.tcp.XMPPTCPConnection;
 
 /**
  * An object from which all XMPP-related actions can be performed
@@ -17,4 +18,10 @@ public interface FortniteXmpp extends AutoCloseable {
      * @since 1.0.0
      */
     ChatResource chat();
+
+    /**
+     * @return the xmpp connection used to communicate with Epic Games' prod xmpp service
+     * @since 1.2.0
+     */
+    XMPPTCPConnection prodService();
 }

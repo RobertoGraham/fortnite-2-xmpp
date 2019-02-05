@@ -1,6 +1,7 @@
 package io.github.robertograham.fortnite2.xmpp.resource;
 
 import io.github.robertograham.fortnite2.domain.Account;
+import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Status;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -34,4 +35,12 @@ public interface ChatResource {
      * @since 1.0.0
      */
     void sendMessageToAccountId(final String accountId, final String messageBody) throws IOException;
+
+    /**
+     * @param status How you will appear to friends
+     * @throws IOException          if an error occurs sending a presence update
+     * @throws NullPointerException is {@code status} is {@code null}
+     * @since 1.2.0
+     */
+    void updateStatus(final Status status) throws IOException;
 }

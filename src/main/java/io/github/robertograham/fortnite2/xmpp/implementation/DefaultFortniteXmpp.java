@@ -10,12 +10,14 @@ import io.github.robertograham.fortnite2.xmpp.listener.OnFriendsListReceivedList
 import io.github.robertograham.fortnite2.xmpp.resource.ChatResource;
 import org.jivesoftware.smack.SmackConfiguration;
 import org.jivesoftware.smack.SmackException;
+import org.jivesoftware.smack.StanzaListener;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.filter.StanzaTypeFilter;
 import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.roster.packet.RosterPacket;
 import org.jivesoftware.smack.tcp.XMPPTCPConnection;
 import org.jivesoftware.smack.tcp.XMPPTCPConnectionConfiguration;
+import org.jivesoftware.smackx.ping.PingManager;
 import org.jxmpp.jid.Jid;
 import org.jxmpp.jid.impl.JidCreate;
 import org.jxmpp.jid.parts.Domainpart;
@@ -25,6 +27,7 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -35,58 +38,29 @@ public final class DefaultFortniteXmpp implements FortniteXmpp {
     private final Domainpart xmppDomainpart;
     private final Fortnite fortnite;
     private final XMPPTCPConnection prodServiceXmppTcpConnection;
-    private final OnChatMessageReceivedListener onChatMessageReceivedListener;
+    private final StanzaListener rosterPacketListener;
+    private final StanzaListener presenceListener;
     private final OnFriendsListReceivedListener onFriendsListReceivedListener;
     private final OnFriendPresenceReceivedListener onFriendPresenceReceivedListener;
-    private final ChatResource chatResource;
+    private final DefaultChatResource chatResource;
+    private final PingManager pingManager;
 
     private DefaultFortniteXmpp(final Builder builder) throws InterruptedException, XMPPException, SmackException, IOException {
         fortnite = builder.fortnite;
-        onChatMessageReceivedListener = builder.onChatMessageReceivedListener;
         onFriendsListReceivedListener = builder.onFriendsListReceivedListener;
         onFriendPresenceReceivedListener = builder.onFriendPresenceReceivedListener;
         SmackConfiguration.DEBUG = builder.debugXmppConnections;
         xmppDomainpart = Domainpart.fromOrThrowUnchecked("prod.ol.epicgames.com");
         prodServiceXmppTcpConnection = buildProdServiceXmppTcpConnection();
-        prodServiceXmppTcpConnection.addAsyncStanzaListener(
-            (final var stanza) -> Optional.of(stanza)
-                .filter((final var nonNullStanza) -> nonNullStanza instanceof RosterPacket)
-                .map((final var nonNullStanza) -> (RosterPacket) nonNullStanza)
-                .map((final var rosterPacket) -> rosterPacket.getRosterItems().stream()
-                    .map(RosterPacket.Item::getJid)
-                    .map(Jid::getLocalpartOrNull)
-                    .filter(Objects::nonNull)
-                    .map(Localpart::asUnescapedString)
-                    .collect(Collectors.toSet()))
-                .ifPresent(onFriendsListReceivedListener::onFriendsListReceived),
-            new StanzaTypeFilter(RosterPacket.class)
-        );
-        prodServiceXmppTcpConnection.addAsyncStanzaListener(
-            (final var stanza) -> Optional.of(stanza)
-                .filter((final var nonNullStanza) -> nonNullStanza instanceof Presence)
-                .map((final var nonNullStanza) -> (Presence) nonNullStanza)
-                .filter((final var presence) ->
-                    Presence.Type.available == presence.getType()
-                        || Presence.Type.unavailable == presence.getType()
-                )
-                .ifPresent((final var presence) -> Optional.ofNullable(presence.getFrom().getLocalpartOrNull())
-                    .ifPresent((final var localpart) -> {
-                        final var accountIdString = localpart.asUnescapedString();
-                        final var status = Presence.Type.available == presence.getType() ?
-                            Presence.Mode.available == presence.getMode() ?
-                                Status.ONLINE
-                                : Status.AWAY
-                            : Status.OFFLINE;
-                        final var sessionOptional = JsonToOptionalOfClassParser.INSTANCE.parseJsonToOptionalOfClass(DefaultSession.class, presence.getStatus())
-                            .map((final var defaultSession) -> (Session) defaultSession);
-                        onFriendPresenceReceivedListener.onFriendPresenceReceived(accountIdString, status, sessionOptional);
-                    })),
-            new StanzaTypeFilter(Presence.class)
-        );
-        chatResource = DefaultChatResource.newInstance(onChatMessageReceivedListener, prodServiceXmppTcpConnection);
+        rosterPacketListener = createRosterPacketListener();
+        presenceListener = createPresenceListener();
+        prodServiceXmppTcpConnection.addAsyncStanzaListener(rosterPacketListener, new StanzaTypeFilter(RosterPacket.class));
+        prodServiceXmppTcpConnection.addAsyncStanzaListener(presenceListener, new StanzaTypeFilter(Presence.class));
+        chatResource = DefaultChatResource.newInstance(builder.onChatMessageReceivedListener, prodServiceXmppTcpConnection);
         prodServiceXmppTcpConnection.connect()
             .login(fortnite.session().accountId(), fortnite.session().accessToken());
-
+        pingManager = PingManager.getInstanceFor(prodServiceXmppTcpConnection);
+        pingManager.setPingInterval(Math.toIntExact(TimeUnit.MINUTES.toSeconds(4) + 30L));
     }
 
     private XMPPTCPConnection buildProdServiceXmppTcpConnection() {
@@ -97,14 +71,57 @@ public final class DefaultFortniteXmpp implements FortniteXmpp {
             .build());
     }
 
+    private StanzaListener createRosterPacketListener() {
+        return (final var stanza) -> Optional.of(stanza)
+            .filter((final var nonNullStanza) -> nonNullStanza instanceof RosterPacket)
+            .map((final var nonNullStanza) -> (RosterPacket) nonNullStanza)
+            .map((final var rosterPacket) -> rosterPacket.getRosterItems().stream()
+                .map(RosterPacket.Item::getJid)
+                .map(Jid::getLocalpartOrNull)
+                .filter(Objects::nonNull)
+                .map(Localpart::asUnescapedString)
+                .collect(Collectors.toSet()))
+            .ifPresent(onFriendsListReceivedListener::onFriendsListReceived);
+    }
+
+    private StanzaListener createPresenceListener() {
+        return (final var stanza) -> Optional.of(stanza)
+            .filter((final var nonNullStanza) -> nonNullStanza instanceof Presence)
+            .map((final var nonNullStanza) -> (Presence) nonNullStanza)
+            .filter((final var presence) -> presence.isAvailable()
+                || Presence.Type.unavailable == presence.getType())
+            .ifPresent((final var presence) -> Optional.ofNullable(presence.getFrom().getLocalpartOrNull())
+                .map(Localpart::asUnescapedString)
+                .filter((final var accountId) -> !fortnite.session().accountId().equals(accountId))
+                .ifPresent((final var accountId) -> {
+                    final var status = presence.isAvailable() ?
+                        presence.isAway() ?
+                            Status.AWAY
+                            : Status.ONLINE
+                        : Status.OFFLINE;
+                    final var sessionOptional = JsonToOptionalOfClassParser.INSTANCE.parseJsonToOptionalOfClass(DefaultSession.class, presence.getStatus())
+                        .map((final var defaultSession) -> (Session) defaultSession);
+                    onFriendPresenceReceivedListener.onFriendPresenceReceived(accountId, status, sessionOptional);
+                }));
+    }
+
     @Override
     public void close() {
+        chatResource.close();
+        prodServiceXmppTcpConnection.removeAsyncStanzaListener(rosterPacketListener);
+        prodServiceXmppTcpConnection.removeAsyncStanzaListener(presenceListener);
+        pingManager.setPingInterval(-1);
         prodServiceXmppTcpConnection.disconnect();
     }
 
     @Override
     public ChatResource chat() {
         return chatResource;
+    }
+
+    @Override
+    public XMPPTCPConnection prodService() {
+        return prodServiceXmppTcpConnection;
     }
 
     /**
