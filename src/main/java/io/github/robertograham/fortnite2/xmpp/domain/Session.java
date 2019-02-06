@@ -1,5 +1,10 @@
 package io.github.robertograham.fortnite2.xmpp.domain;
 
+import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Application;
+import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Platform;
+
+import java.util.Optional;
+
 /**
  * Contains information about a friend's session
  *
@@ -38,4 +43,48 @@ public interface Session {
      * @since 1.1.0
      */
     boolean hasVoiceSupport();
+
+    /**
+     * @return an {@link Optional} of {@link Integer} that's non-empty if the user is in a party
+     * @since 1.3.0
+     */
+    Optional<Integer> partyMemberCount();
+
+    /**
+     * @return an {@link Optional} of {@link Integer} that's non-empty if the user is in a party
+     * @since 1.3.0
+     */
+    Optional<Integer> maxPartyMemberCount();
+
+    /**
+     * @return an {@link Optional} of {@link Integer} that's non-empty if the user is in a party
+     * @since 1.3.0
+     */
+    Optional<String> partyId();
+
+    /**
+     * @return an {@link Optional} of {@link Integer} that's non-empty if the user is in a party
+     * @since 1.3.0
+     */
+    Optional<String> partyKey();
+
+    /**
+     * @return an {@link Optional} of {@link Platform} that represents the platform the user is
+     * updating their presence from
+     * @since 1.3.0
+     */
+    Optional<Platform> platform();
+
+    /**
+     * @return an {@link Optional} of {@link Application} that represents the application the user is
+     * updating their presence from
+     * @since 1.3.0
+     */
+    Optional<Application> application();
+
+    /**
+     * @return an {@link Optional} of {@link Integer} that's non-empty if the user is in a game
+     * @since 1.3.0
+     */
+    Optional<Integer> remainingPlayerCount();
 }

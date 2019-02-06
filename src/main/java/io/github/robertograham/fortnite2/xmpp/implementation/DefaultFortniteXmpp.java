@@ -3,6 +3,8 @@ package io.github.robertograham.fortnite2.xmpp.implementation;
 import io.github.robertograham.fortnite2.client.Fortnite;
 import io.github.robertograham.fortnite2.xmpp.client.FortniteXmpp;
 import io.github.robertograham.fortnite2.xmpp.domain.Session;
+import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Application;
+import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Platform;
 import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Status;
 import io.github.robertograham.fortnite2.xmpp.listener.OnChatMessageReceivedListener;
 import io.github.robertograham.fortnite2.xmpp.listener.OnFriendPresenceReceivedListener;
@@ -22,6 +24,7 @@ import org.jxmpp.jid.Jid;
 import org.jxmpp.jid.impl.JidCreate;
 import org.jxmpp.jid.parts.Domainpart;
 import org.jxmpp.jid.parts.Localpart;
+import org.jxmpp.jid.parts.Resourcepart;
 
 import java.io.IOException;
 import java.util.Objects;
@@ -58,7 +61,15 @@ public final class DefaultFortniteXmpp implements FortniteXmpp {
         prodServiceXmppTcpConnection.addAsyncStanzaListener(presenceListener, new StanzaTypeFilter(Presence.class));
         chatResource = DefaultChatResource.newInstance(builder.onChatMessageReceivedListener, prodServiceXmppTcpConnection);
         prodServiceXmppTcpConnection.connect()
-            .login(fortnite.session().accountId(), fortnite.session().accessToken());
+            .login(
+                fortnite.session().accountId(),
+                fortnite.session().accessToken(),
+                Resourcepart.from(String.format(
+                    "V2:%s:%s",
+                    builder.application.code(),
+                    builder.platform.code()
+                ))
+            );
         pingManager = PingManager.getInstanceFor(prodServiceXmppTcpConnection);
         pingManager.setPingInterval(Math.toIntExact(TimeUnit.MINUTES.toSeconds(4) + 30L));
     }
@@ -138,6 +149,8 @@ public final class DefaultFortniteXmpp implements FortniteXmpp {
         private OnFriendPresenceReceivedListener onFriendPresenceReceivedListener = (final var accountId, final var status, final var sessionOptional) -> {
         };
         private boolean debugXmppConnections = false;
+        private Application application = Application.FORTNITE_CLIENT;
+        private Platform platform = Platform.WINDOWS;
 
         private Builder(final Fortnite fortnite) {
             this.fortnite = fortnite;
@@ -194,8 +207,30 @@ public final class DefaultFortniteXmpp implements FortniteXmpp {
          *                             {@code true} to log and {@code} to not log
          * @return the {@link Builder} instance this was called on
          */
-        public Builder setDebugXmppConnections(boolean debugXmppConnections) {
+        public Builder setDebugXmppConnections(final boolean debugXmppConnections) {
             this.debugXmppConnections = debugXmppConnections;
+            return this;
+        }
+
+        /**
+         * @param application depending on the value, the authenticated user will appear to
+         *                    either be playing Fortnite or in the EpicGames Launcher to friends
+         * @return the {@link Builder} instance this was called on
+         * @throws NullPointerException if {@code application} is {@code null}
+         */
+        public Builder setApplication(final Application application) {
+            this.application = Objects.requireNonNull(application, "application cannot be null");
+            return this;
+        }
+
+        /**
+         * @param platform the icon representing this will be shown to friends of the
+         *                 authenticated user
+         * @return the {@link Builder} instance this was called on
+         * @throws NullPointerException if {@code platform} is {@code null}
+         */
+        public Builder setPlatform(final Platform platform) {
+            this.platform = Objects.requireNonNull(platform, "platform cannot be null");
             return this;
         }
 
