@@ -1,9 +1,11 @@
 package io.github.robertograham.fortnite2.xmpp.resource;
 
 import io.github.robertograham.fortnite2.domain.Account;
+import io.github.robertograham.fortnite2.xmpp.client.FortniteXmpp;
 import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Status;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -43,4 +45,48 @@ public interface ChatResource {
      * @since 1.2.0
      */
     void updateStatus(final Status status) throws IOException;
+
+    /**
+     * @param accountId ID of the account that the messages have been sent to
+     * @return a {@link List} of the bodies of the messages sent to this user
+     * @throws NullPointerException if {@code accountId} is {@code null}
+     * @since 2.0.0
+     */
+    List<String> findAllMessagesSentToAccountId(final String accountId);
+
+    /**
+     * @param account the account that the messages have been sent to
+     * @return a {@link List} of the bodies of the messages sent to this user
+     * @throws NullPointerException if {@code account} is {@code null}
+     * @since 2.0.0
+     */
+    default List<String> findAllMessagesSentToAccount(final Account account) {
+        Objects.requireNonNull(account, "account cannot be null");
+        return findAllMessagesSentToAccountId(account.accountId());
+    }
+
+    /**
+     * @param accountId ID of the account that the messages have received from
+     * @return a {@link List} of the bodies of the messages received from this user
+     * @throws NullPointerException if {@code accountId} is {@code null}
+     * @since 2.0.0
+     */
+    List<String> findAllMessagesReceivedFromAccountId(final String accountId);
+
+    /**
+     * @param account the account that the messages have received from
+     * @return a {@link List} of the bodies of the messages received from this user
+     * @throws NullPointerException if {@code account} is {@code null}
+     * @since 2.0.0
+     */
+    default List<String> findAllMessagesReceivedFromAccount(final Account account) {
+        Objects.requireNonNull(account, "account cannot be null");
+        return findAllMessagesReceivedFromAccountId(account.accountId());
+    }
+
+    /**
+     * @return the instance of {@link FortniteXmpp} this object belongs to
+     * @since 2.0.0
+     */
+    FortniteXmpp fortniteXmpp();
 }

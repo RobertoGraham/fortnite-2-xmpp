@@ -72,6 +72,25 @@ public final class Main {
 }
 ```
 
+The platform and application the authenticated user is using can be spoofed like so:
+
+```java
+import io.github.robertograham.fortnite2.implementation.DefaultFortnite;
+import io.github.robertograham.fortnite2.xmpp.implementation.DefaultFortniteXmpp;
+
+public final class Main {
+
+    public static void main(final String[] args) {
+        final var fortnite = DefaultFortnite.Builder.newInstance("epicGamesEmailAddress", "epicGamesPassword")
+            .build();
+        final var fortniteXmpp = DefaultFortniteXmpp.Builder.newInstance(fortnite)
+            .setApplication(Application.FORTNITE_CLIENT)
+            .setPlatform(Platform.NINTENDO_SWITCH)
+            .build();
+    }
+}
+``` 
+
 ### Cleaning up
 
 When you no longer need your client instance, remember to close your XMPP connections with a call to `FortniteXmpp.close()`. Usage examples further in this document will make 
@@ -111,7 +130,7 @@ public final class Main {
             final var fortnite = DefaultFortnite.Builder.newInstance("epicGamesEmailAddress", "epicGamesPassword")
                 .build();
             final var fortniteXmpp = DefaultFortniteXmpp.Builder.newInstance(fortnite)
-                .setOnFriendsListReceivedListener((final var accountIds) -> {
+                .setOnFriendsListReceivedListener((final var accountIds, final var friend) -> {
                     try {
                         fortnite.account()
                             .findAllByAccountIds(accountIds.toArray(String[]::new))
@@ -147,7 +166,7 @@ public final class Main {
             final var fortnite = DefaultFortnite.Builder.newInstance("epicGamesEmailAddress", "epicGamesPassword")
                 .build();
             final var fortniteXmpp = DefaultFortniteXmpp.Builder.newInstance(fortnite)
-                .setOnFriendPresenceReceivedListener((final var accountId, final var status, final var sessionOptional) ->
+                .setOnFriendPresenceReceivedListener((final var accountId, final var status, final var sessionOptional, final var friend) ->
                     accountIdToStatusSessionEntryMap.put(accountId, new SimpleEntry<>(status, sessionOptional.orElse(null)))
                 )
                 .build()
@@ -181,7 +200,7 @@ public final class Main {
             final var fortnite = DefaultFortnite.Builder.newInstance("epicGamesEmailAddress", "epicGamesPassword")
                 .build();
             final var fortniteXmpp = DefaultFortniteXmpp.Builder.newInstance(fortnite)
-                .setOnChatMessageReceivedListener((final var accountId, final var messageBody) ->
+                .setOnChatMessageReceivedListener((final var accountId, final var messageBody, final var chat) ->
                     messageStringList.add(String.format("%s: %s", accountId, messageBody)))
                 .setDebugXmppConnections(true)
                 .build()

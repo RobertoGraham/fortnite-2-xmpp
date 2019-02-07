@@ -1,54 +1,56 @@
 package io.github.robertograham.fortnite2.xmpp.implementation;
 
+import io.github.robertograham.fortnite2.xmpp.client.FortniteXmpp;
 import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Status;
 import io.github.robertograham.fortnite2.xmpp.listener.OnChatMessageReceivedListener;
 import io.github.robertograham.fortnite2.xmpp.resource.ChatResource;
 import org.jivesoftware.smack.SmackException;
+import org.jivesoftware.smack.chat2.Chat;
 import org.jivesoftware.smack.chat2.ChatManager;
 import org.jivesoftware.smack.chat2.IncomingChatMessageListener;
+import org.jivesoftware.smack.chat2.OutgoingChatMessageListener;
 import org.jivesoftware.smack.packet.Message;
 import org.jivesoftware.smack.packet.Presence;
 import org.jivesoftware.smack.tcp.XMPPTCPConnection;
+import org.jxmpp.jid.EntityBareJid;
 import org.jxmpp.jid.impl.JidCreate;
 import org.jxmpp.jid.parts.Localpart;
 
 import java.io.IOException;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
-final class DefaultChatResource implements ChatResource, AutoCloseable {
+final class DefaultChatResource implements ChatResource, AutoCloseable, IncomingChatMessageListener, OutgoingChatMessageListener {
 
     private static final Set<Status> AVAILABLE_PRESENCE_STATUSES = Set.of(Status.ONLINE, Status.AWAY);
-    private final ChatManager chatManager;
     private final OnChatMessageReceivedListener onChatMessageReceivedListener;
     private final XMPPTCPConnection prodServiceXmppTcpConnection;
-    private final IncomingChatMessageListener incomingChatMessageListener;
+    private final FortniteXmpp fortniteXmpp;
+    private final Map<String, List<Message>> incomingChatMessageCacheMap;
+    private final Map<String, List<Message>> outgoingChatMessageCacheMap;
+    private final ChatManager chatManager;
 
     private DefaultChatResource(final OnChatMessageReceivedListener onChatMessageReceivedListener,
-                                final XMPPTCPConnection prodServiceXmppTcpConnection) {
+                                final XMPPTCPConnection prodServiceXmppTcpConnection,
+                                final FortniteXmpp fortniteXmpp) {
         this.onChatMessageReceivedListener = onChatMessageReceivedListener;
         this.prodServiceXmppTcpConnection = prodServiceXmppTcpConnection;
+        this.fortniteXmpp = fortniteXmpp;
+        incomingChatMessageCacheMap = new HashMap<>();
+        outgoingChatMessageCacheMap = new HashMap<>();
         chatManager = ChatManager.getInstanceFor(this.prodServiceXmppTcpConnection);
-        incomingChatMessageListener = createIncomingChatMessageListener();
-        chatManager.addIncomingListener(incomingChatMessageListener);
+        chatManager.addIncomingListener(this);
+        chatManager.addOutgoingListener(this);
     }
 
     static DefaultChatResource newInstance(final OnChatMessageReceivedListener onChatMessageReceivedListener,
-                                           final XMPPTCPConnection prodServiceXmppTcpConnection) {
+                                           final XMPPTCPConnection prodServiceXmppTcpConnection,
+                                           final FortniteXmpp fortniteXmpp) {
         return new DefaultChatResource(
             onChatMessageReceivedListener,
-            prodServiceXmppTcpConnection
+            prodServiceXmppTcpConnection,
+            fortniteXmpp
         );
-    }
-
-    private IncomingChatMessageListener createIncomingChatMessageListener() {
-        return (entityBareJid, message, chat) -> {
-            if (Message.Type.chat == message.getType())
-                onChatMessageReceivedListener.onChatMessageReceived(
-                    entityBareJid.getLocalpart().asUnescapedString(),
-                    message.getBody()
-                );
-        };
     }
 
     @Override
@@ -77,6 +79,32 @@ final class DefaultChatResource implements ChatResource, AutoCloseable {
         }
     }
 
+    @Override
+    public List<String> findAllMessagesSentToAccountId(final String accountId) {
+        Objects.requireNonNull(accountId, "accountId cannot be null");
+        return getListOfChatMessageBodiesCachedForAccountId(outgoingChatMessageCacheMap, accountId);
+    }
+
+    @Override
+    public List<String> findAllMessagesReceivedFromAccountId(final String accountId) {
+        Objects.requireNonNull(accountId, "accountId cannot be null");
+        return getListOfChatMessageBodiesCachedForAccountId(incomingChatMessageCacheMap, accountId);
+    }
+
+    @Override
+    public FortniteXmpp fortniteXmpp() {
+        return fortniteXmpp;
+    }
+
+    private List<String> getListOfChatMessageBodiesCachedForAccountId(final Map<String, List<Message>> chatMessageCacheMap,
+                                                                      final String accountId) {
+        return Optional.ofNullable(chatMessageCacheMap.get(accountId))
+            .map((final var messageList) -> messageList.stream()
+                .map(Message::getBody)
+                .collect(Collectors.toUnmodifiableList()))
+            .orElseGet(Collections::emptyList);
+    }
+
     private Presence createPresence(final Status status) {
         final var presenceType = AVAILABLE_PRESENCE_STATUSES.contains(status) ?
             Presence.Type.available
@@ -89,6 +117,35 @@ final class DefaultChatResource implements ChatResource, AutoCloseable {
 
     @Override
     public void close() {
-        chatManager.removeIncomingListener(incomingChatMessageListener);
+        chatManager.removeIncomingListener(this);
+        chatManager.removeOutgoingListener(this);
+    }
+
+    @Override
+    public void newIncomingMessage(final EntityBareJid from, final Message message, final Chat chat) {
+        if (Message.Type.chat == message.getType()) {
+            final var accountIdString = getAccountIdFromEntityBareJid(from);
+            cacheChatMessage(incomingChatMessageCacheMap, accountIdString, message);
+            onChatMessageReceivedListener.onChatMessageReceived(accountIdString, message.getBody(), this);
+        }
+    }
+
+    @Override
+    public void newOutgoingMessage(final EntityBareJid to, final Message message, final Chat chat) {
+        if (Message.Type.chat == message.getType())
+            cacheChatMessage(outgoingChatMessageCacheMap, getAccountIdFromEntityBareJid(to), message);
+    }
+
+    private String getAccountIdFromEntityBareJid(final EntityBareJid entityBareJid) {
+        return entityBareJid.getLocalpart()
+            .asUnescapedString();
+    }
+
+    private void cacheChatMessage(final Map<String, List<Message>> chatMessageCacheMap,
+                                  final String accountId,
+                                  final Message message) {
+        chatMessageCacheMap.putIfAbsent(accountId, new ArrayList<>());
+        chatMessageCacheMap.get(accountId)
+            .add(message);
     }
 }

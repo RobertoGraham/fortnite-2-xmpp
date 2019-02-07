@@ -2,6 +2,7 @@ package io.github.robertograham.fortnite2.xmpp.listener;
 
 import io.github.robertograham.fortnite2.xmpp.domain.Session;
 import io.github.robertograham.fortnite2.xmpp.domain.enumeration.Status;
+import io.github.robertograham.fortnite2.xmpp.resource.FriendResource;
 
 import java.util.Optional;
 
@@ -22,9 +23,12 @@ public interface OnFriendPresenceReceivedListener {
      *                        {@link Status#OFFLINE}  if the friend is offline
      * @param sessionOptional an {@link Optional} of {@link Session}
      *                        that's non-empty if {@code status} is not equal to {@link Status#OFFLINE}
-     * @since 1.1.0
+     * @param friend          {@link FriendResource} instance that can be used perform actions with the
+     *                        {@link Session} instance
+     * @since 2.0.0
      */
     void onFriendPresenceReceived(final String accountId,
                                   final Status status,
-                                  final Optional<Session> sessionOptional);
+                                  final Optional<Session> sessionOptional,
+                                  final FriendResource friend);
 }
